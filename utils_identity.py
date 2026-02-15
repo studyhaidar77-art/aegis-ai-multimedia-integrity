@@ -1,59 +1,47 @@
+import os
 import numpy as np
 import cv2
+
 from insightface.app import FaceAnalysis
+from insightface.model_zoo import get_model
 
 
-# -------------------------
-# Load Models (AUTO)
-# -------------------------
 def load_det_rec_models():
-    """
-    Automatically downloads + loads InsightFace models.
-    No manual ONNX paths needed.
-    """
+    # Use local cache folder (good for cloud too)
+    os.environ.setdefault("INSIGHTFACE_HOME", "./.insightface")
 
-    app = FaceAnalysis(
-        name="buffalo_l",  # best balance of speed + accuracy
-        providers=["CPUExecutionProvider"]
-    )
+    # Try NEW insightface API (providers supported)
+    try:
+        app = FaceAnalysis(
+            name="buffalo_l",
+            providers=["CPUExecutionProvider"],
+        )
+    except TypeError:
+        # Fallback OLD insightface API (no providers arg)
+        app = FaceAnalysis(name="buffalo_l")
 
-    # ctx_id = -1 → CPU
-    # (use 0 if you ever get GPU)
+    # ctx_id: -1 = CPU
     app.prepare(ctx_id=-1, det_size=(640, 640))
 
-    return app, None
+    # Recognition model (ArcFace)
+    rec_model = get_model("buffalo_l")
+    try:
+        rec_model.prepare(ctx_id=-1)
+    except Exception:
+        pass
+
+    return app, rec_model
 
 
-# -------------------------
-# Face Embedding
-# -------------------------
-def get_face_embedding(img_bgr, det_model, rec_model=None):
-
-    faces = det_model.get(img_bgr)
-
+def get_face_embedding(bgr_img, det_model, rec_model):
+    # det_model here is FaceAnalysis app
+    faces = det_model.get(bgr_img)
     if not faces:
-        raise ValueError("No face detected.")
+        raise ValueError("No face detected")
 
-    # pick largest face
-    def area(face):
-        x1, y1, x2, y2 = face.bbox.astype(int)
-        return (x2 - x1) * (y2 - y1)
-
-    face = max(faces, key=area)
-
-    emb = face.normed_embedding
-
-    if emb is None:
-        emb = face.embedding
-        emb = emb / (np.linalg.norm(emb) + 1e-9)
-
-    return emb.astype(np.float32).reshape(-1)
-
-
-# -------------------------
-# Cosine Distance
-# -------------------------
-def cosine_distance(a, b):
-    a = a / (np.linalg.norm(a) + 1e-9)
-    b = b / (np.linalg.norm(b) + 1e-9)
-    return float(1.0 - np.dot(a, b))
+    # take biggest face
+    face = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]))
+    emb = face.normed_embedding  # already normalized in many versions
+    emb = np.asarray(emb).reshape(-1).astype(np.float32)
+    emb = emb / (np.linalg.norm(emb) + 1e-9)
+    return emb
