@@ -1,0 +1,26 @@
+# 🛡️ AegisAI — Multimedia Integrity Analyzer
+
+An advanced AI-powered forensic system for detecting deepfakes, identity mismatches, and multimedia manipulation across videos and photos.
+
+## 🔥 Features
+- Deepfake Detection (AI Model)
+- Identity Verification (Reference vs Suspect)
+- Multi-Person Detection
+- Evidence Strength Scoring
+- Smart Verdict System
+- Supports BOTH video and photo analysis
+
+## 🧠 Tech Stack
+- Python
+- Streamlit
+- OpenCV
+- InsightFace
+- Deep Learning Models
+- NumPy / Pandas
+
+## 🚀 Run Locally
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt

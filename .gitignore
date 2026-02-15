@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environments
+env/
+venv/
+.venv/
+
+# Models / weights
+*.pt
+*.pth
+*.onnx
+*.bin
+
+# Media (don't upload private videos/photos)
+*.mp4
+*.mov
+*.avi
+*.jpg
+*.jpeg
+*.png
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db

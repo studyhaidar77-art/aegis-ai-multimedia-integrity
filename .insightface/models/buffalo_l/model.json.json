@@ -1,0 +1,17 @@
+{
+  "name": "buffalo_l",
+  "models": {
+    "detection": {
+      "model_file": "det_10g.onnx"
+    },
+    "recognition": {
+      "model_file": "w600k_r50.onnx"
+    },
+    "landmark_2d_106": {
+      "model_file": "2d106det.onnx"
+    },
+    "genderage": {
+      "model_file": "genderage.onnx"
+    }
+  }
+}
