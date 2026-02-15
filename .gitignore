@@ -2,6 +2,11 @@
 __pycache__/
 *.pyc
 
+.insightface/
+__pycache__/
+*.pyc
+
+
 # Environments
 env/
 venv/

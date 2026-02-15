@@ -4,6 +4,8 @@ import cv2
 import pandas as pd
 from PIL import Image
 import numpy as np
+import os
+os.environ["INSIGHTFACE_HOME"] = "./.insightface"
 
 from utils_video import (
     extract_frames,
