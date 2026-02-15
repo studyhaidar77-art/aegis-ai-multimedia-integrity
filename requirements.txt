@@ -1,6 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 streamlit==1.54.0
 
-numpy
+numpy==1.26.4
 pandas
 pillow
 scikit-learn
@@ -15,7 +17,6 @@ imageio-ffmpeg
 
 torch==2.2.2
 torchvision==0.17.2
-torchaudio==2.2.2
 
 transformers==4.41.2
 huggingface_hub==0.23.4
@@ -23,8 +24,8 @@ tokenizers
 safetensors
 timm
 
-onnx
-onnxruntime
+onnx==1.15.0
+onnxruntime==1.17.3
 
 insightface==0.7.3
 
