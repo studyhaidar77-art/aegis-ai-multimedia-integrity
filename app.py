@@ -33,9 +33,11 @@ st.info(
 # =======================
 # Cached Loaders
 # =======================
-@st.cache_resource
+@st.cache_resource(show_spinner="Loading face recognition models...")
 def get_models_cached():
-    return load_det_rec_models()
+    # prefer_gpu=True will auto-use GPU if available
+    return load_det_rec_models(prefer_gpu=True)
+
 
 det_model, rec_model = get_models_cached()
 
