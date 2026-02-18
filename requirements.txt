@@ -8,15 +8,8 @@ requests==2.32.3
 
 opencv-python-headless==4.10.0.84
 
-# InsightFace / ONNX
+# InsightFace / ONNX (Python 3.13 compatible)
 insightface==0.7.3
-onnxruntime==1.21.1
-
-# HuggingFace stack (versions with stable wheels on py3.10)
-transformers==4.39.3
-tokenizers==0.15.2
-huggingface_hub==0.22.2
-safetensors==0.4.2
-timm==0.9.16
+onnxruntime==1.23.2
 
 scikit-learn==1.5.1
