@@ -1,21 +1,22 @@
-streamlit>=1.30
-numpy
-pandas
-pillow
-tqdm
-requests
+streamlit==1.32.2
 
-opencv-python-headless
+numpy==1.26.4
+pandas==2.2.2
+pillow==10.4.0
+tqdm==4.66.4
+requests==2.32.3
+
+opencv-python-headless==4.10.0.84
 
 # InsightFace / ONNX
 insightface==0.7.3
 onnxruntime==1.21.1
 
-# HF stack (pin to avoid tokenizers build)
-transformers==4.41.2
-tokenizers==0.19.1
-huggingface_hub==0.23.4
-safetensors>=0.4.3
-timm>=1.0.3
+# HuggingFace stack (versions with stable wheels on py3.10)
+transformers==4.39.3
+tokenizers==0.15.2
+huggingface_hub==0.22.2
+safetensors==0.4.2
+timm==0.9.16
 
-scikit-learn
+scikit-learn==1.5.1

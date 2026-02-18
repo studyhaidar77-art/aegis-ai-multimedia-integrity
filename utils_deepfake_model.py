@@ -1,27 +1,46 @@
 import numpy as np
 from PIL import Image
-import torch
-from transformers import pipeline
 
-# A solid real-vs-fake image model (we'll run it on face crops)
+# DO NOT import torch or transformers here
+# Lazy loading prevents Streamlit crashes
+
 MODEL_NAME = "dima806/deepfake_vs_real_image_detection"
+
 
 def load_detector():
     """
-    Loads once. First run will download the model from Hugging Face.
+    Loads the deepfake model safely.
+    If loading fails (common on Streamlit Cloud),
+    we return None instead of crashing the app.
     """
-    device = 0 if torch.cuda.is_available() else -1
-    clf = pipeline("image-classification", model=MODEL_NAME, device=device)
-    return clf
+    try:
+        import torch
+        from transformers import pipeline
+
+        device = 0 if torch.cuda.is_available() else -1
+
+        clf = pipeline(
+            "image-classification",
+            model=MODEL_NAME,
+            device=device
+        )
+
+        return clf
+
+    except Exception as e:
+        print("Deepfake model failed to load:", e)
+        return None
+
 
 def predict_faces(detector, face_crops_rgb):
     """
-    face_crops_rgb: list of numpy arrays (RGB, 224x224)
-    returns:
-      - per_face: list of dicts: {"fake": float, "real": float}
-      - avg_fake: float (0-100)
-      - verdict: str
+    Runs prediction safely.
     """
+
+    # ✅ If model failed → don't crash app
+    if detector is None:
+        return [], 0.0, "Deepfake model unavailable"
+
     if not face_crops_rgb:
         return [], 0.0, "No faces found"
 
@@ -29,31 +48,40 @@ def predict_faces(detector, face_crops_rgb):
     fake_probs = []
 
     for face in face_crops_rgb:
-        img = Image.fromarray(face.astype("uint8"), mode="RGB")
-        out = detector(img)
+        try:
+            img = Image.fromarray(face.astype("uint8"), mode="RGB")
+            out = detector(img)
 
-        # out example: [{'label': 'Real', 'score': 0.98}, {'label': 'Fake', 'score': 0.02}]
-        scores = {"fake": 0.0, "real": 0.0}
-        for item in out:
-            label = item["label"].strip().lower()
-            if "real" in label:
-                scores["real"] = float(item["score"])
-            elif "fake" in label:
-                scores["fake"] = float(item["score"])
+            scores = {"fake": 0.0, "real": 0.0}
 
-        # If model labels are reversed/odd, make sure they sum
-        if scores["fake"] == 0.0 and scores["real"] == 0.0 and len(out) >= 1:
-            # fallback: assume first item is the predicted label
-            top = out[0]["label"].strip().lower()
-            if "fake" in top:
-                scores["fake"] = float(out[0]["score"])
-                scores["real"] = 1.0 - scores["fake"]
-            else:
-                scores["real"] = float(out[0]["score"])
-                scores["fake"] = 1.0 - scores["real"]
+            for item in out:
+                label = item["label"].strip().lower()
 
-        per_face.append(scores)
-        fake_probs.append(scores["fake"])
+                if "real" in label:
+                    scores["real"] = float(item["score"])
+
+                elif "fake" in label:
+                    scores["fake"] = float(item["score"])
+
+            # fallback protection
+            if scores["fake"] == 0.0 and scores["real"] == 0.0:
+                top = out[0]["label"].strip().lower()
+
+                if "fake" in top:
+                    scores["fake"] = float(out[0]["score"])
+                    scores["real"] = 1.0 - scores["fake"]
+                else:
+                    scores["real"] = float(out[0]["score"])
+                    scores["fake"] = 1.0 - scores["real"]
+
+            per_face.append(scores)
+            fake_probs.append(scores["fake"])
+
+        except Exception as e:
+            print("Prediction failed:", e)
+
+    if not fake_probs:
+        return [], 0.0, "Prediction failed"
 
     avg_fake = float(np.mean(fake_probs)) * 100.0
 
