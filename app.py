@@ -5,6 +5,7 @@ import pandas as pd
 from PIL import Image
 import numpy as np
 import os
+
 os.environ["INSIGHTFACE_HOME"] = "./.insightface"
 
 from utils_video import (
@@ -35,11 +36,23 @@ st.info(
 # =======================
 @st.cache_resource(show_spinner="Loading face recognition models...")
 def get_models_cached():
-    # prefer_gpu=True will auto-use GPU if available
-    return load_det_rec_models(prefer_gpu=True)
+    # keep CPU default for cloud; local can still use GPU if you want
+    return load_det_rec_models(prefer_gpu=False)
 
 
-det_model, rec_model = get_models_cached()
+# ✅ UI message so user sees progress in the app
+st.write("Loading face recognition models... (first run can take a few minutes)")
+
+# ✅ Safe load: if cloud disables InsightFace, app still runs
+try:
+    det_model, rec_model = get_models_cached()
+    st.success("✅ Face identity models loaded.")
+except Exception as e:
+    det_model, rec_model = None, None
+    st.warning("⚠️ Face identity module disabled on Streamlit Cloud demo.")
+    st.caption(f"Reason: {type(e).__name__}: {e}")
+
+ID_ENABLED = det_model is not None
 
 
 @st.cache_resource
@@ -388,63 +401,66 @@ used_refs = 0
 photo_emb = None
 video_emb = None
 
-if ref_files:
-    per_photo_embs = []
-    max_photos = min(5, len(ref_files))
-
-    for idx, f in enumerate(ref_files[:max_photos], start=1):
-        rgb = np.array(Image.open(f).convert("RGB"))
-        emb, _, _ = compute_ref_embedding([rgb], det_model, rec_model, show_debug=False)
-        if emb is not None:
-            per_photo_embs.append((idx, emb))
-        else:
-            st.warning(f"Reference photo #{idx}: no face detected, skipped.")
-
-    if len(per_photo_embs) >= 2:
-        kept, dropped, sim_df = filter_reference_outliers(per_photo_embs, thr=0.35)
-        st.write("Reference consistency matrix:")
-        if sim_df is not None:
-            st.dataframe(sim_df, use_container_width=True)
-
-        if dropped:
-            st.warning("Excluded reference outliers:")
-            for (bad_idx, _, med) in dropped:
-                st.write(f"❌ Photo #{bad_idx} excluded (median similarity={med:.3f})")
-
-        if len(kept) > 0:
-            used_refs += len(kept)
-            photo_emb = np.mean(np.stack([e for _, e in kept]), axis=0)
-            photo_emb = photo_emb / (np.linalg.norm(photo_emb) + 1e-9)
-            photo_emb = photo_emb.reshape(-1)
-            st.success(f"✅ Using {len(kept)}/{len(per_photo_embs)} reference photo(s).")
-        else:
-            st.error("All reference photos are inconsistent. Upload correct selfies only.")
-    elif len(per_photo_embs) == 1:
-        used_refs += 1
-        photo_emb = per_photo_embs[0][1]
-        st.info("Only 1 valid reference photo. Outlier check skipped.")
-
-if ref_videos:
-    video_emb, used_v, failed_v, total_frames_seen = enroll_from_reference_videos(
-        ref_videos, det_model, rec_model, frame_every=5, max_frames_per_video=20
-    )
-    if video_emb is not None:
-        used_refs += 1
-    st.info(f"Reference video enrollment: extracted {total_frames_seen} frame(s). Used {used_v}, skipped {failed_v}.")
-
-emb_list = []
-if photo_emb is not None:
-    emb_list.append(photo_emb)
-if video_emb is not None:
-    emb_list.append(video_emb)
-
-if emb_list:
-    ref_emb = np.mean(np.stack(emb_list), axis=0)
-    ref_emb = ref_emb / (np.linalg.norm(ref_emb) + 1e-9)
-    ref_emb = ref_emb.reshape(-1)
-    st.success("✅ Reference embedding created.")
+if not ID_ENABLED:
+    st.info("Identity matching skipped (models unavailable). Reference enrollment disabled on Cloud demo.")
 else:
-    st.info("No reference provided → identity matching will be skipped.")
+    if ref_files:
+        per_photo_embs = []
+        max_photos = min(5, len(ref_files))
+
+        for idx, f in enumerate(ref_files[:max_photos], start=1):
+            rgb = np.array(Image.open(f).convert("RGB"))
+            emb, _, _ = compute_ref_embedding([rgb], det_model, rec_model, show_debug=False)
+            if emb is not None:
+                per_photo_embs.append((idx, emb))
+            else:
+                st.warning(f"Reference photo #{idx}: no face detected, skipped.")
+
+        if len(per_photo_embs) >= 2:
+            kept, dropped, sim_df = filter_reference_outliers(per_photo_embs, thr=0.35)
+            st.write("Reference consistency matrix:")
+            if sim_df is not None:
+                st.dataframe(sim_df, use_container_width=True)
+
+            if dropped:
+                st.warning("Excluded reference outliers:")
+                for (bad_idx, _, med) in dropped:
+                    st.write(f"❌ Photo #{bad_idx} excluded (median similarity={med:.3f})")
+
+            if len(kept) > 0:
+                used_refs += len(kept)
+                photo_emb = np.mean(np.stack([e for _, e in kept]), axis=0)
+                photo_emb = photo_emb / (np.linalg.norm(photo_emb) + 1e-9)
+                photo_emb = photo_emb.reshape(-1)
+                st.success(f"✅ Using {len(kept)}/{len(per_photo_embs)} reference photo(s).")
+            else:
+                st.error("All reference photos are inconsistent. Upload correct selfies only.")
+        elif len(per_photo_embs) == 1:
+            used_refs += 1
+            photo_emb = per_photo_embs[0][1]
+            st.info("Only 1 valid reference photo. Outlier check skipped.")
+
+    if ref_videos:
+        video_emb, used_v, failed_v, total_frames_seen = enroll_from_reference_videos(
+            ref_videos, det_model, rec_model, frame_every=5, max_frames_per_video=20
+        )
+        if video_emb is not None:
+            used_refs += 1
+        st.info(f"Reference video enrollment: extracted {total_frames_seen} frame(s). Used {used_v}, skipped {failed_v}.")
+
+    emb_list = []
+    if photo_emb is not None:
+        emb_list.append(photo_emb)
+    if video_emb is not None:
+        emb_list.append(video_emb)
+
+    if emb_list:
+        ref_emb = np.mean(np.stack(emb_list), axis=0)
+        ref_emb = ref_emb / (np.linalg.norm(ref_emb) + 1e-9)
+        ref_emb = ref_emb.reshape(-1)
+        st.success("✅ Reference embedding created.")
+    else:
+        st.info("No reference provided → identity matching will be skipped.")
 
 
 # =======================
@@ -518,28 +534,33 @@ if uploaded_video is not None:
         else:
             st.info("No faces found in suspect video.")
 
-        video_roi_embs, _ = embed_rois(all_rois_video, det_model, rec_model, fallback_frames_rgb=roi_to_frame)
+        # ✅ Identity embeddings + clustering only if InsightFace available
+        if ID_ENABLED:
+            video_roi_embs, _ = embed_rois(all_rois_video, det_model, rec_model, fallback_frames_rgb=roi_to_frame)
 
-        st.subheader("🧷 Suspect VIDEO Multi-Person Check")
-        cluster_thr = st.slider("Clustering threshold (video)", 0.30, 0.60, 0.42, 0.01)
-        if len(video_roi_embs) >= 3:
-            video_clusters = simple_cluster_embeddings(video_roi_embs, thr=cluster_thr)
-            if len(video_clusters) >= 2:
-                st.error("🚨 TICKET: Suspect VIDEO contains MULTIPLE IDENTITIES.")
-                st.write("Cluster sizes:", [len(c) for c in video_clusters])
+            st.subheader("🧷 Suspect VIDEO Multi-Person Check")
+            cluster_thr = st.slider("Clustering threshold (video)", 0.30, 0.60, 0.42, 0.01)
+            if len(video_roi_embs) >= 3:
+                video_clusters = simple_cluster_embeddings(video_roi_embs, thr=cluster_thr)
+                if len(video_clusters) >= 2:
+                    st.error("🚨 TICKET: Suspect VIDEO contains MULTIPLE IDENTITIES.")
+                    st.write("Cluster sizes:", [len(c) for c in video_clusters])
+                else:
+                    st.success("✅ Suspect VIDEO looks like a single identity.")
             else:
-                st.success("✅ Suspect VIDEO looks like a single identity.")
-        else:
-            st.info("Not enough face embeddings for multi-person check (need ~3+).")
+                st.info("Not enough face embeddings for multi-person check (need ~3+).")
 
-        filtered_faces_video = all_faces_video
-        if all_faces_video and video_clusters and len(video_clusters) >= 2:
-            sel = pick_cluster(video_clusters, video_roi_embs, ref_emb=ref_emb)
-            keep = set(video_clusters[sel])
-            filtered_faces_video = [all_faces_video[i] for i in range(len(all_faces_video)) if i in keep]
-            st.warning(f"✅ Using ONLY identity cluster #{sel+1} (others skipped). Kept {len(filtered_faces_video)} faces.")
-        elif all_faces_video:
             filtered_faces_video = all_faces_video
+            if all_faces_video and video_clusters and len(video_clusters) >= 2:
+                sel = pick_cluster(video_clusters, video_roi_embs, ref_emb=ref_emb)
+                keep = set(video_clusters[sel])
+                filtered_faces_video = [all_faces_video[i] for i in range(len(all_faces_video)) if i in keep]
+                st.warning(f"✅ Using ONLY identity cluster #{sel+1} (others skipped). Kept {len(filtered_faces_video)} faces.")
+            elif all_faces_video:
+                filtered_faces_video = all_faces_video
+        else:
+            filtered_faces_video = all_faces_video
+            st.info("Identity module unavailable → skipping embeddings / clustering (deepfake can still run).")
 
 
 # =======================
@@ -557,7 +578,7 @@ if suspect_photos:
     for i, f in enumerate(suspect_photos, start=1):
         rgb = np.array(Image.open(f).convert("RGB"))
         suspect_rgb_list.append(rgb)
-        cols[(i-1) % 4].image(rgb, caption=f"Suspect Photo {i}", use_container_width=True)
+        cols[(i - 1) % 4].image(rgb, caption=f"Suspect Photo {i}", use_container_width=True)
 
     all_faces_photo = []
     all_rois_photo = []
@@ -577,23 +598,27 @@ if suspect_photos:
     else:
         st.info("No faces found in suspect photos.")
 
-    photo_roi_embs, _ = embed_rois(all_rois_photo, det_model, rec_model, fallback_frames_rgb=roi_to_photo)
+    # ✅ Identity embeddings + clustering only if InsightFace available
+    if ID_ENABLED:
+        photo_roi_embs, _ = embed_rois(all_rois_photo, det_model, rec_model, fallback_frames_rgb=roi_to_photo)
 
-    if len(photo_roi_embs) < 2 and len(suspect_rgb_list) >= 2:
-        extra = embed_full_images(suspect_rgb_list, det_model, rec_model)
-        photo_roi_embs = photo_roi_embs + extra
+        if len(photo_roi_embs) < 2 and len(suspect_rgb_list) >= 2:
+            extra = embed_full_images(suspect_rgb_list, det_model, rec_model)
+            photo_roi_embs = photo_roi_embs + extra
 
-    st.subheader("🧷 Suspect PHOTOS Multi-Person Check")
-    cluster_thr_p = st.slider("Clustering threshold (photos)", 0.30, 0.60, 0.42, 0.01)
-    if len(photo_roi_embs) >= 2:
-        photo_clusters = simple_cluster_embeddings(photo_roi_embs, thr=cluster_thr_p)
-        if len(photo_clusters) >= 2:
-            st.error("🚨 TICKET: Suspect PHOTOS contain MULTIPLE IDENTITIES.")
-            st.write("Cluster sizes:", [len(c) for c in photo_clusters])
+        st.subheader("🧷 Suspect PHOTOS Multi-Person Check")
+        cluster_thr_p = st.slider("Clustering threshold (photos)", 0.30, 0.60, 0.42, 0.01)
+        if len(photo_roi_embs) >= 2:
+            photo_clusters = simple_cluster_embeddings(photo_roi_embs, thr=cluster_thr_p)
+            if len(photo_clusters) >= 2:
+                st.error("🚨 TICKET: Suspect PHOTOS contain MULTIPLE IDENTITIES.")
+                st.write("Cluster sizes:", [len(c) for c in photo_clusters])
+            else:
+                st.success("✅ Suspect PHOTOS look like a single identity.")
         else:
-            st.success("✅ Suspect PHOTOS look like a single identity.")
+            st.info("Not enough face embeddings for multi-person check (need ~2+).")
     else:
-        st.info("Not enough face embeddings for multi-person check (need ~2+).")
+        st.info("Identity module unavailable → skipping embeddings / clustering (deepfake can still run).")
 
     filtered_faces_photo = all_faces_photo
 
@@ -606,7 +631,9 @@ st.subheader("🪪 Identity Result (Reference vs Suspect)")
 sim_use = 0.0
 avg_sim_video, avg_sim_photo = 0.0, 0.0
 
-if ref_emb is None:
+if not ID_ENABLED:
+    st.info("Identity matching skipped (models unavailable).")
+elif ref_emb is None:
     st.info("No reference uploaded → identity match is skipped.")
 else:
     if video_roi_embs:
@@ -734,7 +761,8 @@ if ref_sources >= 2:
 elif ref_sources == 1:
     evidence += 25
 
-if ref_emb is not None:
+# ✅ Add identity evidence only if identity is enabled
+if ID_ENABLED and ref_emb is not None:
     if sim_use >= 0.70:
         evidence += 25
     elif sim_use >= 0.60:
@@ -776,7 +804,7 @@ else:
 st.subheader("🧠 Smart Verdict (Summary)")
 
 best_id_candidates = []
-if ref_emb is not None:
+if ID_ENABLED and ref_emb is not None:
     if video_roi_embs:
         sv = [cosine_sim(e, ref_emb) for e in video_roi_embs if e is not None]
         if sv:
@@ -800,11 +828,11 @@ except Exception:
 fake_score = max(fake_candidates) if fake_candidates else 0.0
 
 if detector is None:
-    st.info("Result: **Deepfake model disabled** — only identity + quality signals available.")
+    st.info("Result: **Deepfake model disabled** — only quality signals available.")
 else:
-    if ref_emb is None:
+    if not ID_ENABLED or ref_emb is None:
         if fake_score >= 80:
-            st.error("Result: **High suspicion of deepfake/manipulation** (no reference identity used).")
+            st.error("Result: **High suspicion of deepfake/manipulation** (identity module off / no reference).")
         elif fake_score >= 60:
             st.warning("Result: **Uncertain** — suspicious artifacts detected. Provide clearer evidence.")
         else:

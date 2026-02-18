@@ -3,6 +3,9 @@ import os
 import numpy as np
 from insightface.app import FaceAnalysis
 
+# ✅ Detect Streamlit Cloud
+ON_STREAMLIT_CLOUD = os.getenv("STREAMLIT_SERVER_RUNNING") == "true"
+
 
 def _pick_ctx_id(prefer_gpu: bool = True) -> int:
     """-1 = CPU, 0 = GPU (if CUDA provider is available)"""
@@ -22,13 +25,20 @@ def load_det_rec_models(
     prefer_gpu: bool = False,   # ✅ default CPU for Streamlit Cloud
     insightface_home: str = "./.insightface",
 ):
+    # ✅ HARD BLOCK InsightFace on Streamlit Cloud demo
+    if ON_STREAMLIT_CLOUD:
+        raise RuntimeError("InsightFace disabled on Streamlit Cloud demo (model download too heavy).")
+
     os.environ.setdefault("INSIGHTFACE_HOME", insightface_home)
 
     ctx_id = _pick_ctx_id(prefer_gpu)
 
-    # ✅ Use smaller model on cloud (faster + less RAM)
+    # ✅ Debug prints for local logs
+    print("📥 Loading InsightFace model (buffalo_s)...")
     det_model = FaceAnalysis(name="buffalo_s")
+    print("✅ FaceAnalysis created. Preparing...")
     det_model.prepare(ctx_id=ctx_id, det_size=det_size)
+    print("✅ InsightFace ready.")
 
     # compatibility with app.py
     rec_model = None
