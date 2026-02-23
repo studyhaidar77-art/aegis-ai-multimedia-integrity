@@ -8,8 +8,9 @@ requests==2.32.3
 
 opencv-python-headless==4.10.0.84
 
-# InsightFace / ONNX (Python 3.13 compatible)
-insightface==0.7.3
-onnxruntime==1.23.2
-
-scikit-learn==1.5.1
+# Deepfake model deps (your code uses transformers pipeline)
+torch==2.2.1
+torchvision==0.17.1
+transformers==4.41.2
+huggingface_hub==0.23.4
+timm==0.9.16
