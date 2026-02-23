@@ -816,5 +816,6 @@ if detector is None:
 else:
     # If you re-enable HF model later, keep your richer logic
     st.info("Result: **Model-based verdict active** (not used in Cloud demo).")
+    st.warning("⚠️ Public Cloud Demo: Identity matching + ML deepfake model are disabled due to platform limits. Results use heuristic signals only.")
 
 st.caption("ℹ️ Temp media is stored in system temp. (We don't delete it automatically on Windows.)")
