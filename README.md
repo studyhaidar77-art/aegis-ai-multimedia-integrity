@@ -1,3 +1,15 @@
+---
+title: AegisAI Multimedia Integrity Analyzer
+emoji: 🛡️
+colorFrom: blue
+colorTo: purple
+sdk: streamlit
+sdk_version: "1.32.2"
+python_version: "3.10"
+app_file: streamlit_app.py
+pinned: false
+---
+
 # 🛡️ AegisAI — Multimedia Integrity Analyzer
 
 An advanced AI-powered forensic system designed to detect deepfakes, verify identity, and analyze multimedia manipulation across **videos and images** using computer vision and deep learning.
