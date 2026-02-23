@@ -1,152 +1,173 @@
----
-title: AegisAI Multimedia Integrity Analyzer
-emoji: 🛡️
-colorFrom: blue
-colorTo: purple
-sdk: streamlit
-sdk_version: "1.32.2"
-python_version: "3.10"
-app_file: streamlit_app.py
-pinned: false
----
+# 🛡️ AegisAI — Multimedia Integrity Analyzer (Video + Photo)
 
-# 🛡️ AegisAI — Multimedia Integrity Analyzer
+AegisAI is a Streamlit-based **multimedia integrity and deepfake risk analyzer** that helps evaluate **suspect videos and photos** for potential manipulation (deepfake / face-swap / heavy edits) using a combination of:
 
-An advanced AI-powered forensic system designed to detect deepfakes, verify identity, and analyze multimedia manipulation across **videos and images** using computer vision and deep learning.
+- **Quality signals** (blur + noise → baseline risk)
+- **Multi-face extraction** (video frames + photos)
+- **Model-based deepfake scoring**
+- **Optional identity verification** (Reference vs Suspect)
+- **Evidence strength scoring**
+- **Downloadable forensic reports (CSV)**
 
-Built as a real-world AI security application, AegisAI demonstrates how modern machine learning techniques can be applied to combat digital impersonation and synthetic media threats.
+> ⚠️ **Disclaimer:** This tool provides an **AI-assisted assessment**, not legal proof. Results may be incorrect. Always verify with human experts and additional forensic methods.
 
 ---
 
-## 🚀 Key Features
+## ✅ Live Demo
+👉 Hugging Face Space: https://huggingface.co/spaces/alihaidar-ai/aegis-ai-multimedia-integrity-full
+👉 Streamlit: https://aegis-ai-multimedia-integrity-4vypudbpyourhrkul5xu7h.streamlit.app/
 
-✅ Deepfake Detection using AI models  
-✅ Identity Verification (Reference vs Suspect)  
-✅ Multi-Person Detection (Impersonation Alerts)  
-✅ Evidence Strength Scoring  
-✅ Smart AI Verdict System  
-✅ Supports **Video + Image Analysis**  
-✅ ROI-based Face Extraction  
-✅ Embedding Clustering for Identity Tracking  
-✅ Streamlit Interactive Interface  
+---
+
+## ✨ Features
+
+### 🎞️ Suspect VIDEO Analysis
+- Upload suspect video (`mp4`, `mov`, `avi`)
+- Extract frames with slider control (1 frame every N frames)
+- Compute per-frame evidence:
+  - Blur score
+  - Noise score
+  - Baseline risk (0–100)
+- Detect faces and show **face crops (224×224)**
+- Optional multi-person check (if identity module is enabled)
+- **Download CSV exports**
+  - ✅ Video frames evidence CSV
+  - ✅ Deepfake per-face scores CSV (video)
+
+### 🖼️ Suspect PHOTO Analysis
+- Upload 1+ suspect photos (`jpg`, `jpeg`, `png`)
+- Detect faces and show **face crops (224×224)**
+- Optional multi-person check (if identity module is enabled)
+- **Download CSV export**
+  - ✅ Deepfake per-face scores CSV (photos)
+
+### 🪪 Reference Identity Verification (Optional)
+- Upload reference **photos (1–5)** and/or **videos (1–3)**
+- Builds a **reference identity embedding**
+- Filters inconsistent reference selfies (outlier detection)
+- Compares suspect faces vs reference (cosine similarity)
+- Identity verdict:
+  - `MATCH` / `UNCERTAIN` / `NOT MATCH`
+
+### 📊 Final Forensic Risk + Smart Verdict
+- Combines multiple signals into a final risk score:
+  - Deepfake model probability
+  - Baseline quality risk
+  - Optional identity similarity
+- Produces:
+  - ✅ Final Forensic Risk (0–100)
+  - ✅ Evidence Strength score (0–100)
+  - ✅ Smart Verdict summary message
+
+### 📥 Downloadable Report (CSV)
+One-click downloadable report includes:
+- `final_risk`
+- `evidence_strength`
+- `identity_similarity_best`
+- `fake_score_best`
+- `avg_blur`, `avg_baseline_risk`
+- flags: identity enabled, reference provided, video uploaded
+- face counts (video + photos)
 
 ---
 
 ## 🧠 Tech Stack
-
-**AI / Machine Learning**
-- Deep Learning Models
-- Face Embeddings
-- InsightFace
-- Transformers
-- Computer Vision
-
-**Backend**
-- Python  
-- NumPy  
-- Pandas  
-
-**Frontend**
-- Streamlit  
-
-**Libraries**
-- OpenCV  
-- Torch  
-- HuggingFace  
-- PIL  
+- **Python**
+- **Streamlit**
+- **OpenCV**
+- **NumPy, Pandas**
+- **Pillow**
+- Deepfake model: **Hugging Face Transformers pipeline** (loaded via `utils_deepfake_model.py`)
+- Optional identity matching: **InsightFace** (embeddings) via `utils_identity.py`
 
 ---
 
-## 🎯 Real-World Applications
-
-- Deepfake Detection Systems  
-- Digital Forensics  
-- Identity Fraud Prevention  
-- Media Verification  
-- Security & Surveillance  
-- Law Enforcement Assistance  
-
----
-
-## ⚙️ Installation
-
-Clone the repository:
+## 🗂️ Project Structure
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/aegis-ai-multimedia-integrity.git
-cd aegis-ai-multimedia-integrity
-```
+.
+├── app.py
+├── streamlit_app.py              # HF entry file (imports app.py)
+├── utils_video.py
+├── utils_identity.py
+├── utils_deepfake_model.py
+├── requirements.txt
+└── README.mdthis project useful, consider giving it a star!
 
-Install dependencies:
-
-```bash
+Create environment
+python -m venv venv
+# Windows:
+# venv\Scripts\activate
+# Linux/Mac:
+# source venv/bin/activate
+2) Install dependencies
 pip install -r requirements.txt
-```
-
-Run the application:
-
-```bash
+3) Run the app
 streamlit run app.py
-```
+✅ How To Use
 
----
+(Optional) Upload reference identity media:
 
-## 📊 System Capabilities
+Reference photos (1–5 clear selfies)
 
-AegisAI performs layered forensic analysis:
+Reference videos (1–3 short real videos)
 
-1️⃣ Face Detection  
-2️⃣ Identity Embedding  
-3️⃣ Similarity Scoring  
-4️⃣ Deepfake Probability Analysis  
-5️⃣ Multi-Identity Clustering  
-6️⃣ Evidence Aggregation  
-7️⃣ AI Verdict Generation  
+Upload suspect evidence:
 
-This multi-stage pipeline increases reliability compared to single-model detectors.
+Suspect video OR suspect photos OR both
 
----
+Review outputs:
 
-## 🔐 Why This Project Matters
+Face crops
 
-The rapid rise of synthetic media presents serious risks including:
+Baseline risk
 
-- Identity theft  
-- Financial fraud  
-- Political misinformation  
-- Social engineering attacks  
+Deepfake probability
 
-AegisAI explores how AI itself can be leveraged to defend against these threats.
+Identity similarity (if reference provided)
 
----
+Final risk + evidence strength
 
-## ⚠️ Disclaimer
+Export CSV reports:
 
-This project is intended for:
+Report summary CSV
 
-- Educational purposes  
-- Research  
-- AI experimentation  
+Video frames CSV (video only)
 
-It should **not** be used as the sole tool for legal or forensic decisions.
+Deepfake per-face CSV (video/photo)
 
----
+📌 Notes & Limitations
 
-## 👨‍💻 Author
+Performance depends on media quality (lighting, blur, resolution, compression).
 
-**Ali Haidar**  
-AI Engineer | Computer Vision Enthusiast | Future MS AI Candidate  
+If faces are too small or occluded, detection may fail.
 
----
+Deepfake models can produce false positives/negatives.
 
-## ⭐ Future Improvements
+Identity verification accuracy depends heavily on clean reference selfies/videos.
 
-- Temporal Deepfake Detection (frame consistency)
-- Audio Deepfake Detection
-- Real-time Camera Analysis
-- Cloud Deployment
-- Model Optimization for Edge Devices
+This is an assistive tool, not a final forensic authority.
 
----
+🔮 Future Improvements
 
-## 🌟 If you found this project useful, consider giving it a star!
+Per-frame deepfake timeline chart
+
+Better face tracking across frames
+
+Auto-select best frames for analysis
+
+Threshold calibration + confidence intervals
+
+PDF report export
+
+👤 Author
+
+Ali Haidar
+BS Computer Science (2020–2024) | AI/ML Projects Portfolio
+
+GitHub: (add your profile/repo link here)
+LinkedIn: (optional)
+
+⭐ Support
+
+If you find this useful, please ⭐ the repository.
