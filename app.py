@@ -5,6 +5,7 @@ import pandas as pd
 from PIL import Image
 import numpy as np
 import os
+import inspect
 
 os.environ["INSIGHTFACE_HOME"] = "./.insightface"
 
@@ -19,6 +20,25 @@ from utils_video import (
 
 from utils_identity import load_det_rec_models, get_face_embedding
 from utils_deepfake_model import load_detector, predict_faces
+
+
+# =======================
+# Streamlit image compat (future-proof)
+# =======================
+def img_kwargs():
+    """
+    Streamlit compatibility:
+    - Older versions: use_column_width
+    - Newer versions: use_container_width
+    Works for st.image() and cols[i].image() because both use the same kwarg name.
+    """
+    try:
+        params = inspect.signature(st.image).parameters
+        if "use_container_width" in params:
+            return {"use_container_width": True}
+    except Exception:
+        pass
+    return {"use_column_width": True}
 
 
 # =======================
@@ -530,7 +550,7 @@ if uploaded_video is not None:
             st.write(f"Total face crops: **{len(all_faces_video)}**")
             cols = st.columns(6)
             for i, face_img in enumerate(all_faces_video[:18]):
-                cols[i % 6].image(face_img, caption=f"VFace {i+1}", use_container_width=True)
+                cols[i % 6].image(face_img, caption=f"VFace {i+1}", **img_kwargs())
         else:
             st.info("No faces found in suspect video.")
 
@@ -578,7 +598,7 @@ if suspect_photos:
     for i, f in enumerate(suspect_photos, start=1):
         rgb = np.array(Image.open(f).convert("RGB"))
         suspect_rgb_list.append(rgb)
-        cols[(i - 1) % 4].image(rgb, caption=f"Suspect Photo {i}", use_container_width=True)
+        cols[(i - 1) % 4].image(rgb, caption=f"Suspect Photo {i}", **img_kwargs())
 
     all_faces_photo = []
     all_rois_photo = []
@@ -594,7 +614,7 @@ if suspect_photos:
         st.write(f"Total face crops: **{len(all_faces_photo)}**")
         cols = st.columns(6)
         for i, face_img in enumerate(all_faces_photo[:18]):
-            cols[i % 6].image(face_img, caption=f"PFace {i+1}", use_container_width=True)
+            cols[i % 6].image(face_img, caption=f"PFace {i+1}", **img_kwargs())
     else:
         st.info("No faces found in suspect photos.")
 
