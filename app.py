@@ -44,10 +44,8 @@ def get_models_cached():
     return load_det_rec_models(prefer_gpu=False)
 
 
-# ✅ UI message so user sees progress in the app
 st.write("Loading face recognition models... (first run can take a few minutes)")
 
-# ✅ Safe load: if cloud disables InsightFace, app still runs
 try:
     det_model, rec_model = get_models_cached()
     st.success("✅ Face identity models loaded.")
@@ -538,7 +536,6 @@ if uploaded_video is not None:
         else:
             st.info("No faces found in suspect video.")
 
-        # ✅ Identity embeddings + clustering only if InsightFace available
         if ID_ENABLED:
             video_roi_embs, _ = embed_rois(all_rois_video, det_model, rec_model, fallback_frames_rgb=roi_to_frame)
 
@@ -602,7 +599,6 @@ if suspect_photos:
     else:
         st.info("No faces found in suspect photos.")
 
-    # ✅ Identity embeddings + clustering only if InsightFace available
     if ID_ENABLED:
         photo_roi_embs, _ = embed_rois(all_rois_photo, det_model, rec_model, fallback_frames_rgb=roi_to_photo)
 
@@ -765,7 +761,6 @@ if ref_sources >= 2:
 elif ref_sources == 1:
     evidence += 25
 
-# ✅ Add identity evidence only if identity is enabled
 if ID_ENABLED and ref_emb is not None:
     if sim_use >= 0.70:
         evidence += 25
@@ -852,5 +847,36 @@ else:
             st.error("Result: **Different person AND likely impersonation/deepfake**.")
         else:
             st.info("Result: **Uncertain** — improve reference quality and upload clearer suspect media.")
+
+
+# =======================
+# Download Report (CSV) ✅ ADDED
+# =======================
+st.subheader("📥 Download Report (CSV)")
+
+report = {
+    "final_risk": round(float(final_risk), 2),
+    "evidence_strength": int(evidence),
+    "identity_similarity_best": round(float(sim_use), 4),
+    "fake_score_best": round(float(fake_score), 2),
+    "avg_blur": round(float(avg_blur), 2),
+    "avg_baseline_risk": round(float(avg_risk), 2),
+    "id_enabled": bool(ID_ENABLED),
+    "reference_provided": bool(ref_emb is not None),
+    "video_uploaded": bool(uploaded_video is not None),
+    "num_video_faces": int(safe_len(filtered_faces_video)),
+    "num_photo_faces": int(safe_len(filtered_faces_photo)),
+}
+
+df_report = pd.DataFrame([report])
+
+st.dataframe(df_report, use_container_width=True)
+
+st.download_button(
+    "⬇️ Download Report CSV",
+    data=df_report.to_csv(index=False).encode("utf-8"),
+    file_name="aegisai_report.csv",
+    mime="text/csv"
+)
 
 st.caption("ℹ️ Temp media is stored in system temp. (We don't delete it automatically on Windows.)")
