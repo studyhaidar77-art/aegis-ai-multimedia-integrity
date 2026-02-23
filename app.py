@@ -475,6 +475,11 @@ filtered_faces_video = []
 video_roi_embs = []
 video_clusters = None
 
+# keep these for download buttons (even if model disabled)
+df = None
+df_faces_v = None
+df_faces_p = None
+
 if uploaded_video is not None:
     st.subheader("🎞️ Suspect VIDEO Analysis")
 
@@ -517,6 +522,14 @@ if uploaded_video is not None:
         c3.metric("Frames used", f"{len(frames)}")
         st.progress(int(max(0, min(100, avg_risk))))
         st.dataframe(df, use_container_width=True)
+
+        # ✅ ADDED: Download frames CSV
+        st.download_button(
+            "⬇️ Download Video Frames CSV",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name="aegisai_video_frames.csv",
+            mime="text/csv"
+        )
 
         all_faces_video = []
         all_rois_video = []
@@ -704,6 +717,19 @@ else:
         st.success(f"Verdict: **{verdict_v}**")
         st.progress(int(calibrated_fake_video))
 
+        # ✅ ADDED: Download per-face deepfake scores (VIDEO)
+        try:
+            if isinstance(per_face_v, (list, tuple)) and len(per_face_v) > 0:
+                df_faces_v = pd.DataFrame(per_face_v)
+                st.download_button(
+                    "⬇️ Download Deepfake Face Scores (VIDEO) CSV",
+                    data=df_faces_v.to_csv(index=False).encode("utf-8"),
+                    file_name="aegisai_deepfake_faces_video.csv",
+                    mime="text/csv"
+                )
+        except Exception:
+            pass
+
     if suspect_photos and filtered_faces_photo:
         per_face_p, avg_fake_p, verdict_p = predict_faces(detector, filtered_faces_photo)
         avg_fake_p = float(avg_fake_p)
@@ -714,6 +740,19 @@ else:
         st.metric("Calibrated FAKE probability", f"{calibrated_fake_photo:.0f}%")
         st.success(f"Verdict: **{verdict_p}**")
         st.progress(int(calibrated_fake_photo))
+
+        # ✅ ADDED: Download per-face deepfake scores (PHOTO)
+        try:
+            if isinstance(per_face_p, (list, tuple)) and len(per_face_p) > 0:
+                df_faces_p = pd.DataFrame(per_face_p)
+                st.download_button(
+                    "⬇️ Download Deepfake Face Scores (PHOTO) CSV",
+                    data=df_faces_p.to_csv(index=False).encode("utf-8"),
+                    file_name="aegisai_deepfake_faces_photo.csv",
+                    mime="text/csv"
+                )
+        except Exception:
+            pass
 
     if (uploaded_video is None or not filtered_faces_video) and (not suspect_photos or not filtered_faces_photo):
         st.info("No usable faces found → deepfake model cannot run.")
@@ -850,7 +889,7 @@ else:
 
 
 # =======================
-# Download Report (CSV) ✅ ADDED
+# Download Report (CSV)
 # =======================
 st.subheader("📥 Download Report (CSV)")
 
@@ -869,7 +908,6 @@ report = {
 }
 
 df_report = pd.DataFrame([report])
-
 st.dataframe(df_report, use_container_width=True)
 
 st.download_button(
