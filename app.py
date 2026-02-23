@@ -26,6 +26,29 @@ from utils_deepfake_model import load_detector, predict_faces
 
 
 # =======================
+# HF-safe temp video saver
+# =======================
+def save_uploaded_video_to_session(uploaded_file, suffix=".mp4"):
+    """Save uploaded video bytes to a stable temp file for this session (HF-safe)."""
+    if uploaded_file is None:
+        return None, None
+
+    video_bytes = uploaded_file.getvalue()
+
+    # keep bytes stable across reruns
+    st.session_state["suspect_video_bytes"] = video_bytes
+
+    # keep file path stable across reruns
+    if "suspect_video_path" not in st.session_state:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        tmp.write(video_bytes)
+        tmp.close()
+        st.session_state["suspect_video_path"] = tmp.name
+
+    return st.session_state["suspect_video_bytes"], st.session_state["suspect_video_path"]
+
+
+# =======================
 # Streamlit Config
 # =======================
 st.set_page_config(page_title="AegisAI — Multimedia Integrity Analyzer", layout="wide")
@@ -33,6 +56,22 @@ st.title("🛡️ AegisAI — Multimedia Integrity Analyzer (Video + Photo)")
 st.info(
     "✅ APP VERSION: FINAL-REF(PHOTO+VIDEO)+SUS(PHOTO/VIDEO/OR-BOTH)+OUTLIERS+TRUECOS+EVIDENCE+MULTI-PERSON+ROI-FALLBACK+SMARTVERDICT-FIX+EVIDENCE-TUNED+PHOTO-EMB-FALLBACK+HF-SAFELOAD"
 )
+
+# =======================
+# Sidebar Reset (HF safe)
+# =======================
+with st.sidebar:
+    if st.button("🔄 Reset App / Clear Temp"):
+        try:
+            p = st.session_state.get("suspect_video_path")
+            if p and os.path.exists(p):
+                os.remove(p)
+        except Exception:
+            pass
+
+        st.session_state.clear()
+        st.cache_resource.clear()
+        st.rerun()
 
 
 # =======================
@@ -333,7 +372,8 @@ def embed_rois(rois_rgb, det_model, rec_model, fallback_frames_rgb=None):
         if (e is None) and (fallback_frames_rgb is not None) and (i < len(fallback_frames_rgb)):
             try:
                 fr = fallback_frames_rgb[i]
-                bgr2 = cv2.cvtColor(fr, cv2.COLOR_RGB2BGR)
+                bgr2 = cv2.cvtColor(fr, cv2.COLOR_BGR2RGB)
+                bgr2 = cv2.cvtColor(bgr2, cv2.COLOR_RGB2BGR)
                 bgr2 = _resize_if_big(bgr2, 1600)
                 bgr2 = _enhance_for_detection(bgr2)
                 e = get_face_embedding(bgr2, det_model, rec_model)
@@ -475,7 +515,7 @@ filtered_faces_video = []
 video_roi_embs = []
 video_clusters = None
 
-# keep these for download buttons (even if model disabled)
+# for downloads
 df = None
 df_faces_v = None
 df_faces_p = None
@@ -483,11 +523,8 @@ df_faces_p = None
 if uploaded_video is not None:
     st.subheader("🎞️ Suspect VIDEO Analysis")
 
-    suspect_bytes = uploaded_video.getvalue()
-    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    suspect_path = tfile.name
-    tfile.write(suspect_bytes)
-    tfile.close()
+    # ✅ HF-safe stable bytes + file path (prevents Missing file mp4)
+    suspect_bytes, suspect_path = save_uploaded_video_to_session(uploaded_video, suffix=".mp4")
 
     st.success("Suspect video uploaded ✅")
     st.video(suspect_bytes)
@@ -523,7 +560,7 @@ if uploaded_video is not None:
         st.progress(int(max(0, min(100, avg_risk))))
         st.dataframe(df, use_container_width=True)
 
-        # ✅ ADDED: Download frames CSV
+        # ✅ Download frames CSV
         st.download_button(
             "⬇️ Download Video Frames CSV",
             data=df.to_csv(index=False).encode("utf-8"),
@@ -717,7 +754,7 @@ else:
         st.success(f"Verdict: **{verdict_v}**")
         st.progress(int(calibrated_fake_video))
 
-        # ✅ ADDED: Download per-face deepfake scores (VIDEO)
+        # ✅ Download per-face deepfake scores (VIDEO)
         try:
             if isinstance(per_face_v, (list, tuple)) and len(per_face_v) > 0:
                 df_faces_v = pd.DataFrame(per_face_v)
@@ -741,7 +778,7 @@ else:
         st.success(f"Verdict: **{verdict_p}**")
         st.progress(int(calibrated_fake_photo))
 
-        # ✅ ADDED: Download per-face deepfake scores (PHOTO)
+        # ✅ Download per-face deepfake scores (PHOTO)
         try:
             if isinstance(per_face_p, (list, tuple)) and len(per_face_p) > 0:
                 df_faces_p = pd.DataFrame(per_face_p)
