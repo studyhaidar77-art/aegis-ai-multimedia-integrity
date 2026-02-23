@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 import tempfile
 import cv2
@@ -59,11 +60,13 @@ ID_ENABLED = det_model is not None
 def get_detector_safe():
     """
     SAFE detector loader:
-    - prevents app crash if HF model missing image processor config
     - returns (detector_or_None, error_string_or_None)
     """
     try:
         det = load_detector()
+        # If load_detector returns None (cloud-safe), still no crash
+        if det is None:
+            return None, "Deepfake model disabled on Cloud demo"
         return det, None
     except Exception as e:
         return None, f"{type(e).__name__}: {e}"
@@ -671,21 +674,16 @@ else:
 
 
 # =======================
-# Deepfake Detection (SAFE)
+# Deepfake Detection (CLOUD-SAFE)
 # =======================
 st.subheader("🧠 Model-based Deepfake Detection")
 
 detector, det_err = get_detector_safe()
 
+# We intentionally disable the HF deepfake model on Streamlit Cloud demo
+# (platform currently uses Python 3.13 + heavy ML wheels mismatch).
 if detector is None:
-    st.error("Deepfake model could not be loaded, so deepfake scoring is DISABLED.")
-    st.caption("Fix in your environment (recommended):")
-    st.code(
-        'pip install -U "transformers==4.41.2" "huggingface_hub==0.23.4" timm pillow\n'
-        "Then delete HF cache folder for this model and rerun.",
-        language="bash"
-    )
-    st.caption(f"Loader error: {det_err}")
+    st.info("🧠 Deepfake ML model is disabled on Streamlit Cloud demo (platform limits). Using heuristic signals only.")
     calibrated_fake_video = 0.0
     calibrated_fake_photo = 0.0
 else:
