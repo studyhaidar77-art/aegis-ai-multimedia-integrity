@@ -1,8 +1,7 @@
-# app.py
+# app.py (CLOUD-FAST: no pandas)
 import streamlit as st
 import tempfile
 import cv2
-import pandas as pd
 from PIL import Image
 import numpy as np
 import os
@@ -28,7 +27,8 @@ from utils_deepfake_model import load_detector, predict_faces
 st.set_page_config(page_title="AegisAI — Multimedia Integrity Analyzer", layout="wide")
 st.title("🛡️ AegisAI — Multimedia Integrity Analyzer (Video + Photo)")
 st.info(
-    "✅ APP VERSION: FINAL-REF(PHOTO+VIDEO)+SUS(PHOTO/VIDEO/OR-BOTH)+OUTLIERS+TRUECOS+EVIDENCE+MULTI-PERSON+ROI-FALLBACK+SMARTVERDICT-FIX+EVIDENCE-TUNED+PHOTO-EMB-FALLBACK+HF-SAFELOAD"
+    "✅ CLOUD DEMO: Identity + HF deepfake model disabled; heuristic signals remain. "
+    "FINAL-REF(PHOTO+VIDEO)+SUS(PHOTO/VIDEO/OR-BOTH)+OUTLIERS+TRUECOS+EVIDENCE+MULTI-PERSON+ROI-FALLBACK+SMARTVERDICT"
 )
 
 
@@ -37,14 +37,11 @@ st.info(
 # =======================
 @st.cache_resource(show_spinner="Loading face recognition models...")
 def get_models_cached():
-    # keep CPU default for cloud; local can still use GPU if you want
     return load_det_rec_models(prefer_gpu=False)
 
 
-# ✅ UI message so user sees progress in the app
 st.write("Loading face recognition models... (first run can take a few minutes)")
 
-# ✅ Safe load: if cloud disables InsightFace, app still runs
 try:
     det_model, rec_model = get_models_cached()
     st.success("✅ Face identity models loaded.")
@@ -59,12 +56,11 @@ ID_ENABLED = det_model is not None
 @st.cache_resource
 def get_detector_safe():
     """
-    SAFE detector loader:
-    - returns (detector_or_None, error_string_or_None)
+    Cloud-safe deepfake detector loader.
+    Your load_detector() returns None intentionally on Cloud demo.
     """
     try:
         det = load_detector()
-        # If load_detector returns None (cloud-safe), still no crash
         if det is None:
             return None, "Deepfake model disabled on Cloud demo"
         return det, None
@@ -228,11 +224,8 @@ def filter_reference_outliers(emb_list, thr=0.35):
         for j in range(n):
             sims[i, j] = cosine_sim(embs[i], embs[j])
 
-    sim_df = pd.DataFrame(
-        sims,
-        index=[f"ref_{i}" for i in idxs],
-        columns=[f"ref_{i}" for i in idxs]
-    )
+    # list-of-lists so we don't need pandas
+    sim_table = sims.tolist()
 
     kept = []
     dropped = []
@@ -244,7 +237,7 @@ def filter_reference_outliers(emb_list, thr=0.35):
         else:
             dropped.append((emb_list[i][0], emb_list[i][1], med))
 
-    return kept, dropped, sim_df
+    return kept, dropped, sim_table
 
 
 def simple_cluster_embeddings(embs, thr=0.42):
@@ -420,10 +413,10 @@ else:
                 st.warning(f"Reference photo #{idx}: no face detected, skipped.")
 
         if len(per_photo_embs) >= 2:
-            kept, dropped, sim_df = filter_reference_outliers(per_photo_embs, thr=0.35)
-            st.write("Reference consistency matrix:")
-            if sim_df is not None:
-                st.dataframe(sim_df, use_container_width=True)
+            kept, dropped, sim_table = filter_reference_outliers(per_photo_embs, thr=0.35)
+            st.write("Reference consistency matrix (rows/cols correspond to your uploaded refs order):")
+            if sim_table is not None:
+                st.dataframe(sim_table, use_container_width=True)
 
             if dropped:
                 st.warning("Excluded reference outliers:")
@@ -508,16 +501,18 @@ if uploaded_video is not None:
             r = forgery_risk_from_signals(b, n)
             rows.append({"frame": i, "blur_score": round(b, 2), "noise_score": round(n, 3), "risk": round(r, 1)})
 
-        df = pd.DataFrame(rows)
-        avg_blur = float(df["blur_score"].mean())
-        avg_risk = float(df["risk"].mean())
+        if rows:
+            avg_blur = float(np.mean([r["blur_score"] for r in rows]))
+            avg_risk = float(np.mean([r["risk"] for r in rows]))
+        else:
+            avg_blur, avg_risk = 0.0, 0.0
 
         c1, c2, c3 = st.columns(3)
         c1.metric("Avg Blur Score (higher=sharper)", f"{avg_blur:.1f}")
         c2.metric("Baseline Risk", f"{avg_risk:.0f}/100")
         c3.metric("Frames used", f"{len(frames)}")
         st.progress(int(max(0, min(100, avg_risk))))
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(rows, use_container_width=True)
 
         all_faces_video = []
         all_rois_video = []
@@ -537,7 +532,6 @@ if uploaded_video is not None:
         else:
             st.info("No faces found in suspect video.")
 
-        # ✅ Identity embeddings + clustering only if InsightFace available
         if ID_ENABLED:
             video_roi_embs, _ = embed_rois(all_rois_video, det_model, rec_model, fallback_frames_rgb=roi_to_frame)
 
@@ -601,7 +595,6 @@ if suspect_photos:
     else:
         st.info("No faces found in suspect photos.")
 
-    # ✅ Identity embeddings + clustering only if InsightFace available
     if ID_ENABLED:
         photo_roi_embs, _ = embed_rois(all_rois_photo, det_model, rec_model, fallback_frames_rgb=roi_to_photo)
 
@@ -680,8 +673,6 @@ st.subheader("🧠 Model-based Deepfake Detection")
 
 detector, det_err = get_detector_safe()
 
-# We intentionally disable the HF deepfake model on Streamlit Cloud demo
-# (platform currently uses Python 3.13 + heavy ML wheels mismatch).
 if detector is None:
     st.info("🧠 Deepfake ML model is disabled on Streamlit Cloud demo (platform limits). Using heuristic signals only.")
     calibrated_fake_video = 0.0
@@ -725,20 +716,21 @@ st.subheader("✅ Final Forensic Risk")
 final_risk = 0.0
 deepfake_score = 0.0
 
-if uploaded_video is not None and filtered_faces_video and detector is not None:
+# Even if HF model is disabled, heuristic deepfake score still works.
+if uploaded_video is not None and filtered_faces_video:
     deepfake_score, _ = deepfake_likeliness_from_faces(filtered_faces_video)
-    final_risk = 0.20 * float(avg_risk) + 0.20 * float(deepfake_score) + 0.60 * float(calibrated_fake_video)
+    final_risk = 0.55 * float(avg_risk) + 0.45 * float(deepfake_score)
     final_risk = max(0.0, min(100.0, final_risk))
-    st.metric("Final Risk (VIDEO primary)", f"{final_risk:.0f}/100")
+    st.metric("Final Risk (VIDEO heuristic)", f"{final_risk:.0f}/100")
     st.progress(int(final_risk))
-elif suspect_photos and filtered_faces_photo and detector is not None:
+elif suspect_photos and filtered_faces_photo:
     deepfake_score, _ = deepfake_likeliness_from_faces(filtered_faces_photo)
-    final_risk = 0.30 * float(deepfake_score) + 0.70 * float(calibrated_fake_photo)
+    final_risk = 1.0 * float(deepfake_score)
     final_risk = max(0.0, min(100.0, final_risk))
-    st.metric("Final Risk (PHOTO only)", f"{final_risk:.0f}/100")
+    st.metric("Final Risk (PHOTO heuristic)", f"{final_risk:.0f}/100")
     st.progress(int(final_risk))
 else:
-    st.info("Not enough model data to compute final risk (deepfake model disabled or no usable faces).")
+    st.info("Not enough data to compute final risk (no usable faces).")
 
 
 # =======================
@@ -759,7 +751,6 @@ if ref_sources >= 2:
 elif ref_sources == 1:
     evidence += 25
 
-# ✅ Add identity evidence only if identity is enabled
 if ID_ENABLED and ref_emb is not None:
     if sim_use >= 0.70:
         evidence += 25
@@ -814,37 +805,16 @@ if ID_ENABLED and ref_emb is not None:
 
 sim_best = max(best_id_candidates) if best_id_candidates else 0.0
 
-fake_candidates = []
-try:
-    if 'calibrated_fake_video' in locals() and calibrated_fake_video > 0:
-        fake_candidates.append(float(calibrated_fake_video))
-    if 'calibrated_fake_photo' in locals() and calibrated_fake_photo > 0:
-        fake_candidates.append(float(calibrated_fake_photo))
-except Exception:
-    pass
-
-fake_score = max(fake_candidates) if fake_candidates else 0.0
-
 if detector is None:
-    st.info("Result: **Deepfake model disabled** — only quality signals available.")
-else:
-    if not ID_ENABLED or ref_emb is None:
-        if fake_score >= 80:
-            st.error("Result: **High suspicion of deepfake/manipulation** (identity module off / no reference).")
-        elif fake_score >= 60:
-            st.warning("Result: **Uncertain** — suspicious artifacts detected. Provide clearer evidence.")
-        else:
-            st.success("Result: **Low suspicion** (likely real).")
+    # Heuristic-only verdict
+    if final_risk >= 80:
+        st.error("Result: **High suspicion of manipulation/deepfake** (heuristic signals).")
+    elif final_risk >= 60:
+        st.warning("Result: **Uncertain** — suspicious artifacts detected. Provide clearer evidence.")
     else:
-        if sim_best >= 0.45 and fake_score >= 80:
-            st.warning("Result: **Same person BUT likely manipulated** (possible deepfake / face-swap / heavy editing).")
-        elif sim_best >= 0.45 and 60 <= fake_score < 80:
-            st.info("Result: **Same person but UNCERTAIN** — suspicious artifacts; needs more evidence.")
-        elif sim_best >= 0.45 and fake_score < 60:
-            st.success("Result: **Same person and likely real**.")
-        elif sim_best < 0.35 and fake_score >= 80:
-            st.error("Result: **Different person AND likely impersonation/deepfake**.")
-        else:
-            st.info("Result: **Uncertain** — improve reference quality and upload clearer suspect media.")
+        st.success("Result: **Low suspicion** (likely real).")
+else:
+    # If you re-enable HF model later, keep your richer logic
+    st.info("Result: **Model-based verdict active** (not used in Cloud demo).")
 
 st.caption("ℹ️ Temp media is stored in system temp. (We don't delete it automatically on Windows.)")
