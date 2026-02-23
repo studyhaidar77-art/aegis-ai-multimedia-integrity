@@ -1,9 +1,8 @@
-# utils_identity.py
+# utils_identity.py (CLOUD-SAFE)
 import os
 import numpy as np
-from insightface.app import FaceAnalysis
 
-# ✅ Detect Streamlit Cloud
+# Detect Streamlit Cloud (Streamlit sets this env var)
 ON_STREAMLIT_CLOUD = os.getenv("STREAMLIT_SERVER_RUNNING") == "true"
 
 
@@ -22,30 +21,38 @@ def _pick_ctx_id(prefer_gpu: bool = True) -> int:
 
 def load_det_rec_models(
     det_size=(640, 640),
-    prefer_gpu: bool = False,   # ✅ default CPU for Streamlit Cloud
+    prefer_gpu: bool = False,
     insightface_home: str = "./.insightface",
 ):
-    # ✅ HARD BLOCK InsightFace on Streamlit Cloud demo
+    """
+    Returns (det_model, rec_model).
+    On Streamlit Cloud: returns (None, None) safely (no insightface dependency).
+    """
     if ON_STREAMLIT_CLOUD:
-        raise RuntimeError("InsightFace disabled on Streamlit Cloud demo (model download too heavy).")
+        # Cloud demo: identity module disabled
+        return None, None
+
+    # ✅ Lazy import so Cloud doesn't crash
+    from insightface.app import FaceAnalysis
 
     os.environ.setdefault("INSIGHTFACE_HOME", insightface_home)
 
     ctx_id = _pick_ctx_id(prefer_gpu)
 
-    # ✅ Debug prints for local logs
-    print("📥 Loading InsightFace model (buffalo_s)...")
     det_model = FaceAnalysis(name="buffalo_s")
-    print("✅ FaceAnalysis created. Preparing...")
     det_model.prepare(ctx_id=ctx_id, det_size=det_size)
-    print("✅ InsightFace ready.")
 
-    # compatibility with app.py
-    rec_model = None
+    rec_model = None  # kept for compatibility with app.py
     return det_model, rec_model
 
 
 def get_face_embedding(bgr_img, det_model, rec_model=None):
+    """
+    Returns normalized embedding (np.ndarray).
+    """
+    if det_model is None:
+        raise RuntimeError("Identity module disabled (det_model is None)")
+
     if bgr_img is None or getattr(bgr_img, "size", 0) == 0:
         raise ValueError("Empty image provided")
 
@@ -53,7 +60,6 @@ def get_face_embedding(bgr_img, det_model, rec_model=None):
     if not faces:
         raise ValueError("No face detected")
 
-    # biggest face
     face = max(
         faces,
         key=lambda f: float((f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1])),
