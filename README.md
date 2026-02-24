@@ -14,11 +14,17 @@ AegisAI is a Streamlit-based **multimedia integrity and deepfake risk analyzer**
 ---
 
 ## ✅ Live Demo
+<<<<<<< HEAD
 👉 Hugging Face Space: https://huggingface.co/spaces/alihaidar-ai/aegis-ai-multimedia-integrity-full
 
 
 👉 Streamlit: https://aegis-ai-multimedia-integrity-4vypudbpyourhrkul5xu7h.streamlit.app/
 
+=======
+👉 Hugging Face Space: **(add your link here)**  
+Example: `https://huggingface.co/spaces/<your-username>/<your-space-name>`
+
+>>>>>>> 8623b52 (Update README)
 ---
 
 ## ✨ Features
@@ -94,13 +100,19 @@ One-click downloadable report includes:
 ├── utils_identity.py
 ├── utils_deepfake_model.py
 ├── requirements.txt
+<<<<<<< HEAD
 └── README.mdthis project useful, consider giving it a star!
 
 Create environment
+=======
+└── README.md
+
+>>>>>>> 8623b52 (Update README)
 python -m venv venv
 # Windows:
 # venv\Scripts\activate
 # Linux/Mac:
+<<<<<<< HEAD
 # source venv/bin/activate
 2) Install dependencies
 pip install -r requirements.txt
@@ -138,6 +150,45 @@ Video frames CSV (video only)
 
 Deepfake per-face CSV (video/photo)
 
+=======
+# source venv/bin/activat
+
+pip install -r requirements.txt
+
+streamlit run app.py
+
+How To Use
+
+(Optional) Upload reference identity media:
+
+Reference photos (1–5 clear selfies)
+
+Reference videos (1–3 short real videos)
+
+Upload suspect evidence:
+
+Suspect video OR suspect photos OR both
+
+Review outputs:
+
+Face crops
+
+Baseline risk
+
+Deepfake probability
+
+Identity similarity (if reference provided)
+
+Final risk + evidence strength
+
+Export CSV reports:
+
+Report summary CSV
+
+Video frames CSV (video only)
+
+Deepfake per-face CSV (video/photo)
+>>>>>>> 8623b52 (Update README)
 📌 Notes & Limitations
 
 Performance depends on media quality (lighting, blur, resolution, compression).
@@ -172,4 +223,8 @@ LinkedIn: (optional)
 
 ⭐ Support
 
+<<<<<<< HEAD
 If you find this useful, please ⭐ the repository.
+=======
+If you find this useful, please ⭐ the repository.
+>>>>>>> 8623b52 (Update README)
